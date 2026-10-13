@@ -27,7 +27,7 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 
 # 编译 SDK
 cd ../..
-source /opt/ros/jazzy/setup.bash
+source /opt/ros/jazzy/setup.bash   # 需提前安装运控(提供 ROS 2 Jazzy)
 sudo rosdep init 2>/dev/null || true   # 已初始化过会报错,忽略
 rosdep update
 rosdep install --from-paths . --ignore-src -r -y
