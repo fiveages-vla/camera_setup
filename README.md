@@ -1,13 +1,13 @@
-# camera_setup
+# Camera Setup
 
-Orbbec Gemini 305 / 330 相机与 CAN 的安装、启动脚本(ROS 2 Jazzy,x86_64 / arm64 均可)。
+目前脚本仅适配 **Orbbec** 摄像头(Gemini 305 / 330 系列),另含 CAN 启动脚本(ROS 2 Jazzy,x86_64 / arm64 均可)。
 
 - `OrbbecSDK_ROS2/`:官方 SDK(submodule,`v2.7.6`)
 - `camera.sh`:启动相机
 - `killcam.sh`:停止相机
 - `can.sh`:启动 CAN
 
-## 1. 获取代码
+## 获取代码
 
 ```bash
 git clone --recurse-submodules git@github.com:fiveages-vla/camera_setup.git
@@ -15,7 +15,9 @@ git clone --recurse-submodules git@github.com:fiveages-vla/camera_setup.git
 ```
 
 
-## 2. 安装(只需一次)
+## Orbbec
+
+### 1. 安装(只需一次)
 
 ```bash
 sudo apt install -y libusb-1.0-0-dev libgflags-dev git python3-rosdep
@@ -36,7 +38,7 @@ colcon build
 
 x86_64 与 arm64 步骤相同,但编译产物与架构绑定:换机器架构后需重新编译,不要拷贝 `build/`、`install/`、`log/`。
 
-## 3. 启动相机
+### 2. 启动相机
 
 ```bash
 ./camera.sh        # 交互选择 30 / 60 Hz
@@ -68,7 +70,7 @@ ros2 topic hz /camera_head/color/image_raw/compressed
 
 日志在 `/tmp/camera_logs/`。
 
-## 4. 启动 CAN(使用腰关节时需要)
+## 启动 CAN(使用腰关节时需要)
 
 ```bash
 ./can.sh
