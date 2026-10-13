@@ -66,8 +66,7 @@ ros2 topic hz /camera_head/color/image_raw/compressed
 查看画面(需要图形界面,依赖 `ros-jazzy-rqt-image-view`):
 
 ```bash
-./view.sh          # 每个相机一个窗口
-./view.sh head     # 只看头部,可选 left / right / head
+./view.sh          # 打开一个窗口,默认显示 head,通过下拉菜单切换相机
 ```
 
 停止:
