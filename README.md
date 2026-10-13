@@ -48,6 +48,18 @@ x86_64 与 arm64 步骤相同,但编译产物与架构绑定:换机器架构后�
 - `/camera_right_wrist/color/image_raw/compressed`
 - `/camera_head/color/image_raw/compressed`
 
+验证(新开终端):
+
+```bash
+source /opt/ros/jazzy/setup.bash
+export RMW_IMPLEMENTATION=rmw_zenoh_cpp ROS_DOMAIN_ID=16   # 与 camera.sh 保持一致
+
+ros2 topic list | grep camera
+ros2 topic hz /camera_head/color/image_raw/compressed
+```
+
+`topic list` 应能看到上述话题,`topic hz` 的频率应接近所选帧率。
+
 停止:
 
 ```bash
