@@ -1,6 +1,5 @@
 # Camera Setup
 
-目前脚本仅适配 **Orbbec** 摄像头(Gemini 305 / 330 系列),另含 CAN 启动脚本(ROS 2 Jazzy,x86_64 / arm64 均可)。
 
 - `OrbbecSDK_ROS2/`:官方 SDK(submodule,`v2.7.6`)
 - `camera.sh`:启动相机
@@ -16,6 +15,8 @@ git clone --recurse-submodules git@github.com:fiveages-vla/camera_setup.git
 
 
 ## Orbbec
+
+目前脚本仅适配 **Orbbec** 摄像头(Gemini 305 / 330 系列)
 
 ### 1. 安装(只需一次)
 
@@ -44,11 +45,11 @@ x86_64 与 arm64 步骤相同,但编译产物与架构绑定:换机器架构后�
 ./camera.sh        # 交互选择 30 / 60 Hz
 ```
 
-按提示选择左腕 / 右腕 / 头部对应的相机序列号,选择会被记住。启动后发布:
+相机型号:头部为 Gemini 335Lg,左右腕部为 Gemini 305。按提示选择左腕 / 右腕 / 头部对应的相机序列号,选择会被记住。启动后发布:
 
-- `/camera_left_wrist/color/image_raw/compressed`
-- `/camera_right_wrist/color/image_raw/compressed`
-- `/camera_head/color/image_raw/compressed`
+- `/camera_left_wrist/color/image_raw/compressed`(腕部,Gemini 305)
+- `/camera_right_wrist/color/image_raw/compressed`(腕部,Gemini 305)
+- `/camera_head/color/image_raw/compressed`(头部,Gemini 335Lg)
 
 验证(新开终端):
 
@@ -61,6 +62,13 @@ ros2 topic hz /camera_head/color/image_raw/compressed
 ```
 
 `topic list` 应能看到上述话题,`topic hz` 的频率应接近所选帧率。
+
+查看画面(需要图形界面,依赖 `ros-jazzy-rqt-image-view`):
+
+```bash
+./view.sh          # 每个相机一个窗口
+./view.sh head     # 只看头部,可选 left / right / head
+```
 
 停止:
 
