@@ -1,7 +1,7 @@
 # Camera Setup
 
 
-- `OrbbecSDK_ROS2/`:官方 SDK(submodule,`v2.7.6`)
+- `OrbbecSDK_ROS2/`:官方 ROS2 驱动(submodule,固定提交 `cb24b007cd3309bc5340fa89d5082b69eba20601`;驱动 `2.8.7`,内置 SDK `2.8.6`)
 - `camera.sh`:启动相机
 - `killcam.sh`:停止相机
 - `can.sh`:启动 CAN
@@ -10,9 +10,16 @@
 
 ```bash
 git clone --recurse-submodules git@github.com:fiveages-vla/camera_setup.git
-# 已 clone 的:git submodule update --init
+cd camera_setup
+# 已 clone 的:在 camera_setup 目录执行 git submodule update --init
+# 应用本机原仓库的话题映射等改动;已应用时跳过
+git -C OrbbecSDK_ROS2 apply --reverse --check ../patches/orbbec-local.patch 2>/dev/null || \
+  git -C OrbbecSDK_ROS2 apply ../patches/orbbec-local.patch
 ```
 
+`patches/orbbec-local.patch` 保存了本机原仓库的 3 处改动,包括 Gemini 305 左右目映射到统一的 `color/image_raw` 话题。`camera.sh` 的 `selected_color_eye` 参数依赖此补丁;首次获取或重新检出子模块后,先应用补丁再编译。当前工作区已应用。
+
+`camera.sh` 和 `view.sh` 固定使用脚本所在目录的 `OrbbecSDK_ROS2/`,不接受 `ORBBEC_WS` 环境变量覆盖。ROS 2 Jazzy 本身仍使用 `/opt/ros/jazzy`。
 
 ## Orbbec
 
@@ -28,13 +35,17 @@ cd OrbbecSDK_ROS2/orbbec_camera/scripts
 sudo bash install_udev_rules.sh
 sudo udevadm control --reload-rules && sudo udevadm trigger
 
-# 编译 SDK
+# 安装 ROS 依赖
 cd ../..
 source /opt/ros/jazzy/setup.bash   # 需提前安装运控(提供 ROS 2 Jazzy)
 sudo rosdep init 2>/dev/null || true   # 已初始化过会报错,忽略
 rosdep update
 rosdep install --from-paths . --ignore-src -r -y
-colcon build
+
+# 在当前 OrbbecSDK_ROS2 目录编译,避免加载其他工作区
+env -i HOME="$HOME" LANG="${LANG:-C.UTF-8}" PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+  bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash && colcon build'
+cd ..   # 返回 camera_setup
 ```
 
 x86_64 与 arm64 步骤相同,但编译产物与架构绑定:换机器架构后需重新编译,不要拷贝 `build/`、`install/`、`log/`。

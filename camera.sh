@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-ORBBEC_WS="${ORBBEC_WS:-$SCRIPT_DIR/OrbbecSDK_ROS2}"
+ORBBEC_WS="$SCRIPT_DIR/OrbbecSDK_ROS2"
 LOG_DIR="/tmp/camera_logs"
 PID_FILE="/tmp/camera_pids.txt"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/camup"
@@ -86,7 +86,7 @@ log() {
 }
 
 ensure_usb_permissions() {
-    local rule_src="/opt/ros/jazzy/share/orbbec_camera/udev/99-obsensor-libusb.rules"
+    local rule_src="$ORBBEC_WS/orbbec_camera/scripts/99-obsensor-libusb.rules"
     local rule_dst="/etc/udev/rules.d/99-obsensor-libusb.rules"
     local dev
     local devs
@@ -138,6 +138,7 @@ ensure_usb_permissions() {
 
 source_ros() {
     set +u
+    unset AMENT_PREFIX_PATH CMAKE_PREFIX_PATH COLCON_PREFIX_PATH LD_LIBRARY_PATH PYTHONPATH
     source /opt/ros/jazzy/setup.bash
     source "$ORBBEC_WS/install/setup.bash"
     set -u
@@ -632,9 +633,10 @@ start_background() {
     local logfile="$2"
     shift 2
 
-    nohup bash -lc "
+    nohup bash --noprofile --norc -c "
 set -Ee
 set +u
+unset AMENT_PREFIX_PATH CMAKE_PREFIX_PATH COLCON_PREFIX_PATH LD_LIBRARY_PATH PYTHONPATH
 source /opt/ros/jazzy/setup.bash
 source '$ORBBEC_WS/install/setup.bash'
 set -u
@@ -656,9 +658,10 @@ ensure_zenoh_router() {
         return 0
     fi
 
-    nohup bash -lc "
+    nohup bash --noprofile --norc -c "
 set -Ee
 set +u
+unset AMENT_PREFIX_PATH CMAKE_PREFIX_PATH COLCON_PREFIX_PATH LD_LIBRARY_PATH PYTHONPATH
 source /opt/ros/jazzy/setup.bash
 source '$ORBBEC_WS/install/setup.bash'
 set -u

@@ -4,7 +4,7 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-ORBBEC_WS="${ORBBEC_WS:-$SCRIPT_DIR/OrbbecSDK_ROS2}"
+ORBBEC_WS="$SCRIPT_DIR/OrbbecSDK_ROS2"
 
 if [[ -z "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
     printf 'ERROR: no DISPLAY; run from a desktop terminal or use ssh -X / VNC.\n' >&2
@@ -12,8 +12,13 @@ if [[ -z "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
 fi
 
 set +u
+unset AMENT_PREFIX_PATH CMAKE_PREFIX_PATH COLCON_PREFIX_PATH LD_LIBRARY_PATH PYTHONPATH
 source /opt/ros/jazzy/setup.bash
-[[ -f "$ORBBEC_WS/install/setup.bash" ]] && source "$ORBBEC_WS/install/setup.bash"
+if [[ ! -f "$ORBBEC_WS/install/setup.bash" ]]; then
+    printf 'ERROR: build %s/OrbbecSDK_ROS2 first; see README.md.\n' "$SCRIPT_DIR" >&2
+    exit 1
+fi
+source "$ORBBEC_WS/install/setup.bash"
 set -u
 export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_zenoh_cpp}"
 export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-16}"
