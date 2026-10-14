@@ -30,6 +30,7 @@ fi
 
 WIDTH=640
 HEIGHT=480
+BUILD_FIRST=0
 FPS="${1:-}"
 AE_MAX_EXPOSURE="${CAM_AE_MAX_EXPOSURE:-120}"
 WRIST_EXPOSURE="${CAM_WRIST_EXPOSURE:-50}"
@@ -49,35 +50,56 @@ if (( $# > 1 )); then
     exit 2
 fi
 
-if [[ -z "$FPS" ]]; then
-    if [[ -t 0 ]]; then
-        printf '请选择相机帧率：\n'
-        printf '  1) 30 Hz\n'
-        printf '  2) 60 Hz（实验性：Gemini 305 可能无法稳定出图）\n'
-        while true; do
-            read -r -p '请输入选项 [1-2]（默认 30）: ' fps_choice
-            case "$fps_choice" in
-                ''|1|30) FPS=30; break ;;
-                2|60) FPS=60; break ;;
-                *) printf '无效选项，请输入 1 或 2。\n' >&2 ;;
-            esac
-        done
-    else
-        FPS=30
-    fi
-fi
-
 case "$FPS" in
-    30|60) ;;
+    ''|30|60) ;;
     *)
         printf 'ERROR: unsupported FPS %q; choose 30 or 60\n' "$FPS" >&2
         exit 2
         ;;
 esac
 
-if [[ "$FPS" == 60 ]]; then
-    printf 'WARN: 60 Hz 在 Gemini 335Lg 上测试正常，但 Gemini 305 可能无法稳定出图。\n' >&2
-fi
+select_startup_mode() {
+    local choice
+    BUILD_FIRST=0
+    [[ -t 0 ]] || return 0
+
+    printf '请选择相机启动方式：\n'
+    printf '  1) 正常启动（默认）\n'
+    printf '  2) 首次配置 / 重新编译，然后启动\n'
+    while true; do
+        read -r -p '请输入选项 [1-2]（回车正常启动）: ' choice || return 1
+        case "$choice" in
+            ''|1) return 0 ;;
+            2) BUILD_FIRST=1; return 0 ;;
+            *) printf '无效选项，请输入 1 或 2。\n' >&2 ;;
+        esac
+    done
+}
+
+select_frame_rate() {
+    local fps_choice
+    if [[ -z "$FPS" ]]; then
+        if [[ -t 0 ]]; then
+            printf '请选择相机帧率：\n'
+            printf '  1) 30 Hz\n'
+            printf '  2) 60 Hz（实验性：Gemini 305 可能无法稳定出图）\n'
+            while true; do
+                read -r -p '请输入选项 [1-2]（默认 30）: ' fps_choice || return 1
+                case "$fps_choice" in
+                    ''|1|30) FPS=30; break ;;
+                    2|60) FPS=60; break ;;
+                    *) printf '无效选项，请输入 1 或 2。\n' >&2 ;;
+                esac
+            done
+        else
+            FPS=30
+        fi
+    fi
+
+    if [[ "$FPS" == 60 ]]; then
+        printf 'WARN: 60 Hz 在 Gemini 335Lg 上测试正常，但 Gemini 305 可能无法稳定出图。\n' >&2
+    fi
+}
 
 mkdir -p "$LOG_DIR"
 
@@ -168,6 +190,110 @@ require_file() {
         log "ERROR: missing file: $1"
         exit 1
     fi
+}
+
+build_driver() {
+    local expected_commit="cb24b007cd3309bc5340fa89d5082b69eba20601"
+    if [[ ! -e "$ORBBEC_WS/.git" ]]; then
+        log "ERROR: initialize the driver first: git submodule update --init"
+        return 1
+    fi
+    if [[ "$(git -C "$ORBBEC_WS" rev-parse HEAD)" != "$expected_commit" ]]; then
+        log "ERROR: OrbbecSDK_ROS2 must be at $expected_commit"
+        return 1
+    fi
+
+    # Configure the pinned driver's launch files before compiling on each machine.
+    /usr/bin/python3 - "$ORBBEC_WS" <<'PY'
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+updates = {}
+
+def configure(relative, replacements):
+    path = root / relative
+    original = text = path.read_text()
+    for old, new in replacements:
+        if new in text:
+            continue
+        if text.count(old) != 1:
+            raise SystemExit(f"ERROR: unexpected driver source: {relative}")
+        text = text.replace(old, new, 1)
+    if path.suffix == '.py':
+        compile(text, str(path), 'exec')
+    if text != original:
+        updates[path] = text
+
+color_remappings = '''    def selected_color_remappings(context):
+        eye = LaunchConfiguration("selected_color_eye").perform(context)
+        common = [
+            ("device_status", "_device_status"),
+            ("depth_filter_status", "_depth_filter_status"),
+            ("depth_filters/status", "_depth_filters/status"),
+        ]
+        if eye == "left":
+            return [
+                ("left_color/image_raw", "color/image_raw"),
+                ("left_color/image_raw/compressed", "color/image_raw/compressed"),
+                ("left_color/camera_info", "_camera_info"),
+                ("left_color/metadata", "_metadata"),
+                ("right_color/image_raw", "_right_color/image_raw"),
+                ("right_color/image_raw/compressed", "_right_color/image_raw/compressed"),
+                ("right_color/camera_info", "_right_color/camera_info"),
+                ("right_color/metadata", "_right_color/metadata"),
+            ] + common
+        if eye == "right":
+            return [
+                ("right_color/image_raw", "color/image_raw"),
+                ("right_color/image_raw/compressed", "color/image_raw/compressed"),
+                ("right_color/camera_info", "_camera_info"),
+                ("right_color/metadata", "_metadata"),
+                ("left_color/image_raw", "_left_color/image_raw"),
+                ("left_color/image_raw/compressed", "_left_color/image_raw/compressed"),
+                ("left_color/camera_info", "_left_color/camera_info"),
+                ("left_color/metadata", "_left_color/metadata"),
+            ] + common
+        return common
+
+'''
+usb_argument = "        DeclareLaunchArgument('usb_port', default_value=''),\n"
+node_factory = '    def create_node_action(context, args):\n'
+node_parameters = '                                parameters=params,\n'
+configure('orbbec_camera/launch/gemini305.launch.py', [
+    (usb_argument, usb_argument + "        DeclareLaunchArgument('selected_color_eye', default_value=''),\n"),
+    (node_factory, color_remappings + node_factory),
+    (node_parameters, node_parameters + '                                remappings=selected_color_remappings(context),\n'),
+])
+configure('orbbec_camera/launch/gemini_330_series.launch.py', [
+    (node_parameters, node_parameters + '''                                remappings=[
+                                    ("color/camera_info", "_camera_info"),
+                                    ("color/metadata", "_metadata"),
+                                    ("device_status", "_device_status"),
+                                    ("depth_filter_status", "_depth_filter_status"),
+                                    ("depth_filters/status", "_depth_filters/status"),
+                                ],
+'''),
+])
+configure('orbbec_camera/tools/list_camera_profile.cpp', [
+    ('      } else if (sensor->getType() == OB_SENSOR_COLOR || sensor->getType() == OB_SENSOR_DEPTH ||\n',
+     '      } else if (sensor->getType() == OB_SENSOR_COLOR ||\n'
+     '                 sensor->getType() == OB_SENSOR_COLOR_LEFT ||\n'
+     '                 sensor->getType() == OB_SENSOR_COLOR_RIGHT ||\n'
+     '                 sensor->getType() == OB_SENSOR_DEPTH ||\n'),
+])
+for path, text in updates.items():
+    path.write_text(text)
+print('Driver topic configuration ready.')
+PY
+
+    env -i HOME="$HOME" LANG="${LANG:-C.UTF-8}" PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+        bash --noprofile --norc -c '
+set -Ee
+source /opt/ros/jazzy/setup.bash
+cd -- "$1"
+exec colcon build
+' bash "$ORBBEC_WS"
 }
 
 parse_detected_devices() {
@@ -693,8 +819,8 @@ wait_for_topic_once() {
 }
 
 main() {
-    ensure_usb_permissions
     require_file "$ORBBEC_WS/install/setup.bash"
+    ensure_usb_permissions
     require_file "$ORBBEC_WS/orbbec_camera/launch/gemini305.launch.py"
     require_file "$ORBBEC_WS/orbbec_camera/launch/gemini_330_series.launch.py"
 
@@ -821,6 +947,19 @@ main() {
     log "Use killcam to stop them. Logs: $LOG_DIR"
 }
 
+run_camera() {
+    select_startup_mode
+    if (( BUILD_FIRST )); then
+        build_driver
+    fi
+    if [[ ! -f "$ORBBEC_WS/install/setup.bash" ]]; then
+        log "ERROR: 尚未编译相机驱动，请运行 ./camera.sh 并选择 2（首次配置）。"
+        return 1
+    fi
+    select_frame_rate
+    main
+}
+
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-    main "$@"
+    run_camera
 fi
