@@ -1,8 +1,9 @@
 # Camera Setup
 
+## 1.Orbbec相机配置 
 Gemini 305 左右腕相机和 Gemini 335Lg 头部相机的启动脚本。ROS2 驱动为 **2.8.7**,内置 SDK 为 **2.8.6**,官方子模块固定在 `cb24b007cd3309bc5340fa89d5082b69eba20601`。
 
-## 获取代码
+### 1.1 获取代码
 
 ```bash
 git clone --recurse-submodules git@github.com:fiveages-vla/camera_setup.git
@@ -15,7 +16,7 @@ cd camera_setup
 git submodule update --init
 ```
 
-## 新机器安装
+### 1.2 新机器安装
 
 先安装 ROS 2 Jazzy(`install.sh` 依赖 `/opt/ros/jazzy`,不会自动安装 ROS)。以下命令在 `camera_setup` 目录执行:
 
@@ -28,7 +29,7 @@ git submodule update --init
 
 安装 udev 规则后重新插拔相机。启动菜单选择 **2（首次配置 / 重新编译，然后启动）**,脚本自动配置话题映射、编译并继续启动相机。x86_64 和 arm64 均在目标机器上编译,不要复制其他机器的 `build/`、`install/`、`log/`。
 
-## 启动和停止
+### 1.3 启动和停止
 
 ```bash
 ./camera.sh        # 回车正常启动,帧率回车默认 30 Hz
@@ -57,7 +58,8 @@ ros2 topic hz /camera_head/color/image_raw/compressed
 
 日志在 `/tmp/camera_logs/`。
 
-## CAN
+## 2. CAN
+设置腰部关节通信
 
 ```bash
 ./can.sh
