@@ -4,6 +4,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_DIR="$(dirname -- "$SCRIPT_DIR")"
 ORBBEC_WS="$REPO_DIR/OrbbecSDK_ROS2"
+WRIST_LAUNCH="$SCRIPT_DIR/launch/gemini305.launch.py"
 LOG_DIR="/tmp/camera_logs"
 PID_FILE="/tmp/camera_pids.txt"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/camup"
@@ -31,7 +32,6 @@ fi
 
 WIDTH=640
 HEIGHT=480
-BUILD_FIRST=0
 FPS="${1:-}"
 AE_MAX_EXPOSURE="${CAM_AE_MAX_EXPOSURE:-120}"
 WRIST_EXPOSURE="${CAM_WRIST_EXPOSURE:-50}"
@@ -42,8 +42,8 @@ WAIT_TIMEOUT="${CAM_WAIT_TIMEOUT:-180}"
 LEFT_RUNTIME_CONFIG="/tmp/gemini305_left_wrist_runtime.yaml"
 RIGHT_RUNTIME_CONFIG="/tmp/gemini305_right_wrist_runtime.yaml"
 
-LEFT_TOPIC="/camera_left_wrist/left_color/image_raw/compressed"
-RIGHT_TOPIC="/camera_right_wrist/right_color/image_raw/compressed"
+LEFT_TOPIC="/camera_left_wrist/color/image_raw/compressed"
+RIGHT_TOPIC="/camera_right_wrist/color/image_raw/compressed"
 HEAD_TOPIC="/camera_head/color/image_raw/compressed"
 
 if (( $# > 1 )); then
@@ -58,24 +58,6 @@ case "$FPS" in
         exit 2
         ;;
 esac
-
-select_startup_mode() {
-    local choice
-    BUILD_FIRST=0
-    [[ -t 0 ]] || return 0
-
-    printf '请选择相机启动方式：\n'
-    printf '  1) 正常启动（默认）\n'
-    printf '  2) 首次配置 / 重新编译，然后启动\n'
-    while true; do
-        read -r -p '请输入选项 [1-2]（回车正常启动）: ' choice || return 1
-        case "$choice" in
-            ''|1) return 0 ;;
-            2) BUILD_FIRST=1; return 0 ;;
-            *) printf '无效选项，请输入 1 或 2。\n' >&2 ;;
-        esac
-    done
-}
 
 select_frame_rate() {
     local fps_choice
@@ -191,26 +173,6 @@ require_file() {
         log "ERROR: missing file: $1"
         exit 1
     fi
-}
-
-build_driver() {
-    local expected_commit="cb24b007cd3309bc5340fa89d5082b69eba20601"
-    if [[ ! -e "$ORBBEC_WS/.git" ]]; then
-        log "ERROR: initialize the driver first: git submodule update --init"
-        return 1
-    fi
-    if [[ "$(git -C "$ORBBEC_WS" rev-parse HEAD)" != "$expected_commit" ]]; then
-        log "ERROR: OrbbecSDK_ROS2 must be at $expected_commit"
-        return 1
-    fi
-
-    env -i HOME="$HOME" LANG="${LANG:-C.UTF-8}" PATH=/usr/bin:/bin:/usr/sbin:/sbin \
-        bash --noprofile --norc -c '
-set -Ee
-source /opt/ros/jazzy/setup.bash
-cd -- "$1"
-exec colcon build
-' bash "$ORBBEC_WS"
 }
 
 parse_detected_devices() {
@@ -737,6 +699,7 @@ wait_for_topic_once() {
 
 main() {
     require_file "$ORBBEC_WS/install/setup.bash"
+    require_file "$WRIST_LAUNCH"
     ensure_usb_permissions
     require_file "$ORBBEC_WS/orbbec_camera/launch/gemini305.launch.py"
     require_file "$ORBBEC_WS/orbbec_camera/launch/gemini_330_series.launch.py"
@@ -807,7 +770,7 @@ main() {
     if (( has_left == 1 )); then
         make_gemini305_config "$LEFT_RUNTIME_CONFIG" "$LEFT_WRIST_SERIAL" "$left_usb_port" left
         start_background "camera_left_wrist" "$LOG_DIR/camera_left_wrist.log" \
-            ros2 launch orbbec_camera gemini305.launch.py \
+            ros2 launch "$WRIST_LAUNCH" \
             camera_name:=camera_left_wrist \
             serial_number:="$LEFT_WRIST_SERIAL" \
             usb_port:="$left_usb_port" \
@@ -818,7 +781,7 @@ main() {
     if (( has_right == 1 )); then
         make_gemini305_config "$RIGHT_RUNTIME_CONFIG" "$RIGHT_WRIST_SERIAL" "$right_usb_port" right
         start_background "camera_right_wrist" "$LOG_DIR/camera_right_wrist.log" \
-            ros2 launch orbbec_camera gemini305.launch.py \
+            ros2 launch "$WRIST_LAUNCH" \
             camera_name:=camera_right_wrist \
             serial_number:="$RIGHT_WRIST_SERIAL" \
             usb_port:="$right_usb_port" \
@@ -863,12 +826,8 @@ main() {
 }
 
 run_camera() {
-    select_startup_mode
-    if (( BUILD_FIRST )); then
-        build_driver
-    fi
     if [[ ! -f "$ORBBEC_WS/install/setup.bash" ]]; then
-        log "ERROR: 尚未编译相机驱动，请运行 ./quick_start.sh 选择「启动相机」 并选择 2（首次配置）。"
+        log "ERROR: 尚未编译相机驱动，请运行 ./quick_start.sh 选择 1（安装依赖并编译）。"
         return 1
     fi
     select_frame_rate

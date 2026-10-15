@@ -30,7 +30,7 @@ Gemini 305 左右腕相机 + Gemini 335Lg 头部相机。OrbbecSDK_ROS2版本v2.
 
 ### 1.2 启动
 
-选 **2) 启动相机**(需要重新编译时选「首次配置 / 重新编译」)
+选 **2) 启动相机**，直接进入启动流程。安装或重新编译驱动请选 **1) 安装依赖并编译**。
 
 ### 1.3 可视化
 
@@ -38,8 +38,8 @@ Gemini 305 左右腕相机 + Gemini 335Lg 头部相机。OrbbecSDK_ROS2版本v2.
 
 ### 1.4 话题
 
-- `/camera_left_wrist/left_color/image_raw/compressed`
-- `/camera_right_wrist/right_color/image_raw/compressed`
+- `/camera_left_wrist/color/image_raw/compressed`
+- `/camera_right_wrist/color/image_raw/compressed`
 - `/camera_head/color/image_raw/compressed`
 
 ## 2. CAN
