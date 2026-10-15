@@ -10,7 +10,7 @@ git clone --recurse-submodules git@github.com:fiveages-vla/camera_setup.git
 ```
 camera_setup# ./quick_start.sh
 Camera quick start
-  1) 安装依赖    (scripts/install.sh)
+  1) 安装依赖并编译    (scripts/install.sh)
   2) 启动相机    (scripts/camera.sh)
   3) 可视化      (scripts/view.sh)
   4) 启动 CAN    (scripts/can.sh)
@@ -26,11 +26,11 @@ Gemini 305 左右腕相机 + Gemini 335Lg 头部相机。OrbbecSDK_ROS2版本v2.
 ### 1.1 安装
 
 1. 确保已安装 ROS 2 Jazzy
-2. 安装 Orbbec SDK:选 **1) 安装依赖**
+2. 安装并编译 Orbbec SDK:选 **1) 安装依赖并编译**
 
 ### 1.2 启动
 
-选 **2) 启动相机**(首次选「首次配置 / 重新编译」)
+选 **2) 启动相机**(需要重新编译时选「首次配置 / 重新编译」)
 
 ### 1.3 可视化
 

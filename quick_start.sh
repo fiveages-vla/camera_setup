@@ -29,7 +29,7 @@ fi
 
 cat <<'MENU'
 Camera quick start
-  1) 安装依赖    (scripts/install.sh)
+  1) 安装依赖并编译    (scripts/install.sh)
   2) 启动相机    (scripts/camera.sh)
   3) 可视化      (scripts/view.sh)
   4) 启动 CAN    (scripts/can.sh)

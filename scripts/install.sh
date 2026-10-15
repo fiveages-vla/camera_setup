@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install system dependencies for the Orbbec ROS2 camera setup (ROS 2 Jazzy).
+# Install dependencies and build the Orbbec ROS2 driver (ROS 2 Jazzy).
 # Usage: ./scripts/install.sh
 set -euo pipefail
 
@@ -38,5 +38,15 @@ set -u
 $SUDO rosdep init 2>/dev/null || true
 rosdep update
 rosdep install --from-paths "${SDK_DIR}" --ignore-src -r -y
+
+echo "==> Building OrbbecSDK_ROS2 with colcon"
+# Clean environment so a stray overlay workspace cannot leak into the build.
+env -i HOME="$HOME" LANG="${LANG:-C.UTF-8}" PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+  bash --noprofile --norc -c '
+set -Ee
+source "/opt/ros/$1/setup.bash"
+cd -- "$2"
+exec colcon build
+' bash "${ROS_DISTRO_NAME}" "${SDK_DIR}"
 
 echo "==> Done"
