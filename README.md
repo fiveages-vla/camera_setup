@@ -8,7 +8,15 @@ git clone --recurse-submodules git@github.com:fiveages-vla/camera_setup.git
 所有操作从 `./quick_start.sh` 菜单进入:
 
 ```
-1) 安装依赖   2) 启动相机   3) 可视化   4) 启动 CAN   5) 停止相机
+camera_setup# ./quick_start.sh
+Camera quick start
+  1) 安装依赖    (scripts/install.sh)
+  2) 启动相机    (scripts/camera.sh)
+  3) 可视化      (scripts/view.sh)
+  4) 启动 CAN    (scripts/can.sh)
+  5) 停止相机    (scripts/killcam.sh)
+  q) 退出
+请选择 [1-5/q]:
 ```
 
 也可直接带参数运行:`./quick_start.sh install|camera|view|can|stop`。
