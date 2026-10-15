@@ -4,7 +4,6 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_DIR="$(dirname -- "$SCRIPT_DIR")"
 ORBBEC_WS="$REPO_DIR/OrbbecSDK_ROS2"
-WRAPPER_LAUNCH="$SCRIPT_DIR/launch/gemini305_single_eye.launch.py"
 LOG_DIR="/tmp/camera_logs"
 PID_FILE="/tmp/camera_pids.txt"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/camup"
@@ -43,8 +42,8 @@ WAIT_TIMEOUT="${CAM_WAIT_TIMEOUT:-180}"
 LEFT_RUNTIME_CONFIG="/tmp/gemini305_left_wrist_runtime.yaml"
 RIGHT_RUNTIME_CONFIG="/tmp/gemini305_right_wrist_runtime.yaml"
 
-LEFT_TOPIC="/camera_left_wrist/color/image_raw/compressed"
-RIGHT_TOPIC="/camera_right_wrist/color/image_raw/compressed"
+LEFT_TOPIC="/camera_left_wrist/left_color/image_raw/compressed"
+RIGHT_TOPIC="/camera_right_wrist/right_color/image_raw/compressed"
 HEAD_TOPIC="/camera_head/color/image_raw/compressed"
 
 if (( $# > 1 )); then
@@ -740,7 +739,6 @@ main() {
     require_file "$ORBBEC_WS/install/setup.bash"
     ensure_usb_permissions
     require_file "$ORBBEC_WS/orbbec_camera/launch/gemini305.launch.py"
-    require_file "$WRAPPER_LAUNCH"
     require_file "$ORBBEC_WS/orbbec_camera/launch/gemini_330_series.launch.py"
 
     stop_old_camera_processes
@@ -809,11 +807,10 @@ main() {
     if (( has_left == 1 )); then
         make_gemini305_config "$LEFT_RUNTIME_CONFIG" "$LEFT_WRIST_SERIAL" "$left_usb_port" left
         start_background "camera_left_wrist" "$LOG_DIR/camera_left_wrist.log" \
-            ros2 launch "$WRAPPER_LAUNCH" \
+            ros2 launch orbbec_camera gemini305.launch.py \
             camera_name:=camera_left_wrist \
             serial_number:="$LEFT_WRIST_SERIAL" \
             usb_port:="$left_usb_port" \
-            selected_color_eye:=left \
             config_file_path:="$LEFT_RUNTIME_CONFIG"
         wait_for_topic_once "$LEFT_TOPIC"
     fi
@@ -821,11 +818,10 @@ main() {
     if (( has_right == 1 )); then
         make_gemini305_config "$RIGHT_RUNTIME_CONFIG" "$RIGHT_WRIST_SERIAL" "$right_usb_port" right
         start_background "camera_right_wrist" "$LOG_DIR/camera_right_wrist.log" \
-            ros2 launch "$WRAPPER_LAUNCH" \
+            ros2 launch orbbec_camera gemini305.launch.py \
             camera_name:=camera_right_wrist \
             serial_number:="$RIGHT_WRIST_SERIAL" \
             usb_port:="$right_usb_port" \
-            selected_color_eye:=right \
             config_file_path:="$RIGHT_RUNTIME_CONFIG"
         wait_for_topic_once "$RIGHT_TOPIC"
     fi
