@@ -13,6 +13,12 @@ else
   SUDO="sudo"
 fi
 
+echo "==> Removing stale colcon build artifacts"
+# Build outputs copied from another machine/arch are invalid; rebuild on this one.
+for stale in build install log; do
+  rm -rf "${SDK_DIR:?}/${stale}"
+done
+
 echo "==> Installing apt packages"
 $SUDO apt update
 $SUDO apt install -y \
