@@ -19,8 +19,6 @@ Camera quick start
 请选择 [1-5/q]:
 ```
 
-也可直接带参数运行:`./quick_start.sh install|camera|view|can|stop`。
-
 ## 1. Orbbec 相机
 
 Gemini 305 左右腕相机 + Gemini 335Lg 头部相机。OrbbecSDK_ROS2版本v2.8.7
