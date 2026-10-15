@@ -1,10 +1,10 @@
 #!/bin/bash
 # Install system dependencies for the Orbbec ROS2 camera setup (ROS 2 Jazzy).
-# Usage: ./install.sh
+# Usage: ./scripts/install.sh
 set -euo pipefail
 
 ROS_DISTRO_NAME=jazzy
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 SDK_DIR="${REPO_DIR}/OrbbecSDK_ROS2"
 
 if [ "$(id -u)" -eq 0 ]; then

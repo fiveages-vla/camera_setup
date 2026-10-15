@@ -4,7 +4,8 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-ORBBEC_WS="$SCRIPT_DIR/OrbbecSDK_ROS2"
+REPO_DIR="$(dirname -- "$SCRIPT_DIR")"
+ORBBEC_WS="$REPO_DIR/OrbbecSDK_ROS2"
 
 if [[ -z "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
     printf 'ERROR: no DISPLAY; run from a desktop terminal or use ssh -X / VNC.\n' >&2
@@ -15,7 +16,7 @@ set +u
 unset AMENT_PREFIX_PATH CMAKE_PREFIX_PATH COLCON_PREFIX_PATH LD_LIBRARY_PATH PYTHONPATH
 source /opt/ros/jazzy/setup.bash
 if [[ ! -f "$ORBBEC_WS/install/setup.bash" ]]; then
-    printf 'ERROR: build %s/OrbbecSDK_ROS2 first; see README.md.\n' "$SCRIPT_DIR" >&2
+    printf 'ERROR: build %s/OrbbecSDK_ROS2 first; see README.md.\n' "$REPO_DIR" >&2
     exit 1
 fi
 source "$ORBBEC_WS/install/setup.bash"

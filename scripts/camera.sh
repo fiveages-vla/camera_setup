@@ -2,7 +2,8 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-ORBBEC_WS="$SCRIPT_DIR/OrbbecSDK_ROS2"
+REPO_DIR="$(dirname -- "$SCRIPT_DIR")"
+ORBBEC_WS="$REPO_DIR/OrbbecSDK_ROS2"
 LOG_DIR="/tmp/camera_logs"
 PID_FILE="/tmp/camera_pids.txt"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/camup"
@@ -953,7 +954,7 @@ run_camera() {
         build_driver
     fi
     if [[ ! -f "$ORBBEC_WS/install/setup.bash" ]]; then
-        log "ERROR: 尚未编译相机驱动，请运行 ./camera.sh 并选择 2（首次配置）。"
+        log "ERROR: 尚未编译相机驱动，请运行 ./quick_start.sh 选择「启动相机」 并选择 2（首次配置）。"
         return 1
     fi
     select_frame_rate
