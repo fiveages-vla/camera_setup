@@ -17,21 +17,14 @@ git submodule update --init
 
 ## 新机器安装
 
-先安装 ROS 2 Jazzy。以下命令在 `camera_setup` 目录执行:
+先安装 ROS 2 Jazzy(`install.sh` 依赖 `/opt/ros/jazzy`,不会自动安装 ROS)。以下命令在 `camera_setup` 目录执行:
 
 ```bash
-sudo apt install -y libusb-1.0-0-dev libgflags-dev python3-rosdep python3-colcon-common-extensions \
-  ros-jazzy-rmw-zenoh-cpp ros-jazzy-compressed-image-transport ros-jazzy-rqt-image-view
-
-sudo bash OrbbecSDK_ROS2/orbbec_camera/scripts/install_udev_rules.sh
-
-source /opt/ros/jazzy/setup.bash
-sudo rosdep init 2>/dev/null || true
-rosdep update
-rosdep install --from-paths OrbbecSDK_ROS2 --ignore-src -r -y
-
+./install.sh
 ./camera.sh
 ```
+
+`install.sh` 依次完成:安装 apt 依赖(libusb、gflags、rosdep、colcon、rmw_zenoh、compressed_image_transport、rqt_image_view)、安装 Orbbec udev 规则、`rosdep init/update` 并安装 `OrbbecSDK_ROS2` 的 ROS 依赖。非 root 用户会自动使用 `sudo`。
 
 安装 udev 规则后重新插拔相机。启动菜单选择 **2（首次配置 / 重新编译，然后启动）**,脚本自动配置话题映射、编译并继续启动相机。x86_64 和 arm64 均在目标机器上编译,不要复制其他机器的 `build/`、`install/`、`log/`。
 
