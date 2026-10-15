@@ -38,8 +38,8 @@ Gemini 305 左右腕相机 + Gemini 335Lg 头部相机。OrbbecSDK_ROS2版本v2.
 
 ### 1.4 话题
 
-- `/camera_left_wrist/color/image_raw/compressed`
-- `/camera_right_wrist/color/image_raw/compressed`
+- `/camera_left_wrist/left_color/image_raw/compressed`
+- `/camera_right_wrist/right_color/image_raw/compressed`
 - `/camera_head/color/image_raw/compressed`
 
 ## 2. CAN
