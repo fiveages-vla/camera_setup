@@ -4,6 +4,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_DIR="$(dirname -- "$SCRIPT_DIR")"
 ORBBEC_WS="$REPO_DIR/OrbbecSDK_ROS2"
+WRAPPER_LAUNCH="$SCRIPT_DIR/launch/gemini305_single_eye.launch.py"
 LOG_DIR="/tmp/camera_logs"
 PID_FILE="/tmp/camera_pids.txt"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/camup"
@@ -203,90 +204,6 @@ build_driver() {
         log "ERROR: OrbbecSDK_ROS2 must be at $expected_commit"
         return 1
     fi
-
-    # Configure the pinned driver's launch files before compiling on each machine.
-    /usr/bin/python3 - "$ORBBEC_WS" <<'PY'
-from pathlib import Path
-import sys
-
-root = Path(sys.argv[1])
-updates = {}
-
-def configure(relative, replacements):
-    path = root / relative
-    original = text = path.read_text()
-    for old, new in replacements:
-        if new in text:
-            continue
-        if text.count(old) != 1:
-            raise SystemExit(f"ERROR: unexpected driver source: {relative}")
-        text = text.replace(old, new, 1)
-    if path.suffix == '.py':
-        compile(text, str(path), 'exec')
-    if text != original:
-        updates[path] = text
-
-color_remappings = '''    def selected_color_remappings(context):
-        eye = LaunchConfiguration("selected_color_eye").perform(context)
-        common = [
-            ("device_status", "_device_status"),
-            ("depth_filter_status", "_depth_filter_status"),
-            ("depth_filters/status", "_depth_filters/status"),
-        ]
-        if eye == "left":
-            return [
-                ("left_color/image_raw", "color/image_raw"),
-                ("left_color/image_raw/compressed", "color/image_raw/compressed"),
-                ("left_color/camera_info", "_camera_info"),
-                ("left_color/metadata", "_metadata"),
-                ("right_color/image_raw", "_right_color/image_raw"),
-                ("right_color/image_raw/compressed", "_right_color/image_raw/compressed"),
-                ("right_color/camera_info", "_right_color/camera_info"),
-                ("right_color/metadata", "_right_color/metadata"),
-            ] + common
-        if eye == "right":
-            return [
-                ("right_color/image_raw", "color/image_raw"),
-                ("right_color/image_raw/compressed", "color/image_raw/compressed"),
-                ("right_color/camera_info", "_camera_info"),
-                ("right_color/metadata", "_metadata"),
-                ("left_color/image_raw", "_left_color/image_raw"),
-                ("left_color/image_raw/compressed", "_left_color/image_raw/compressed"),
-                ("left_color/camera_info", "_left_color/camera_info"),
-                ("left_color/metadata", "_left_color/metadata"),
-            ] + common
-        return common
-
-'''
-usb_argument = "        DeclareLaunchArgument('usb_port', default_value=''),\n"
-node_factory = '    def create_node_action(context, args):\n'
-node_parameters = '                                parameters=params,\n'
-configure('orbbec_camera/launch/gemini305.launch.py', [
-    (usb_argument, usb_argument + "        DeclareLaunchArgument('selected_color_eye', default_value=''),\n"),
-    (node_factory, color_remappings + node_factory),
-    (node_parameters, node_parameters + '                                remappings=selected_color_remappings(context),\n'),
-])
-configure('orbbec_camera/launch/gemini_330_series.launch.py', [
-    (node_parameters, node_parameters + '''                                remappings=[
-                                    ("color/camera_info", "_camera_info"),
-                                    ("color/metadata", "_metadata"),
-                                    ("device_status", "_device_status"),
-                                    ("depth_filter_status", "_depth_filter_status"),
-                                    ("depth_filters/status", "_depth_filters/status"),
-                                ],
-'''),
-])
-configure('orbbec_camera/tools/list_camera_profile.cpp', [
-    ('      } else if (sensor->getType() == OB_SENSOR_COLOR || sensor->getType() == OB_SENSOR_DEPTH ||\n',
-     '      } else if (sensor->getType() == OB_SENSOR_COLOR ||\n'
-     '                 sensor->getType() == OB_SENSOR_COLOR_LEFT ||\n'
-     '                 sensor->getType() == OB_SENSOR_COLOR_RIGHT ||\n'
-     '                 sensor->getType() == OB_SENSOR_DEPTH ||\n'),
-])
-for path, text in updates.items():
-    path.write_text(text)
-print('Driver topic configuration ready.')
-PY
 
     env -i HOME="$HOME" LANG="${LANG:-C.UTF-8}" PATH=/usr/bin:/bin:/usr/sbin:/sbin \
         bash --noprofile --norc -c '
@@ -823,6 +740,7 @@ main() {
     require_file "$ORBBEC_WS/install/setup.bash"
     ensure_usb_permissions
     require_file "$ORBBEC_WS/orbbec_camera/launch/gemini305.launch.py"
+    require_file "$WRAPPER_LAUNCH"
     require_file "$ORBBEC_WS/orbbec_camera/launch/gemini_330_series.launch.py"
 
     stop_old_camera_processes
@@ -891,7 +809,7 @@ main() {
     if (( has_left == 1 )); then
         make_gemini305_config "$LEFT_RUNTIME_CONFIG" "$LEFT_WRIST_SERIAL" "$left_usb_port" left
         start_background "camera_left_wrist" "$LOG_DIR/camera_left_wrist.log" \
-            ros2 launch orbbec_camera gemini305.launch.py \
+            ros2 launch "$WRAPPER_LAUNCH" \
             camera_name:=camera_left_wrist \
             serial_number:="$LEFT_WRIST_SERIAL" \
             usb_port:="$left_usb_port" \
@@ -903,7 +821,7 @@ main() {
     if (( has_right == 1 )); then
         make_gemini305_config "$RIGHT_RUNTIME_CONFIG" "$RIGHT_WRIST_SERIAL" "$right_usb_port" right
         start_background "camera_right_wrist" "$LOG_DIR/camera_right_wrist.log" \
-            ros2 launch orbbec_camera gemini305.launch.py \
+            ros2 launch "$WRAPPER_LAUNCH" \
             camera_name:=camera_right_wrist \
             serial_number:="$RIGHT_WRIST_SERIAL" \
             usb_port:="$right_usb_port" \
