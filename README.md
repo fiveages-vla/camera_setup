@@ -18,8 +18,12 @@ git submodule update --init
 
 ### 1.2 新机器安装
 
-先安装 ROS 2 Jazzy(`install.sh` 依赖 `/opt/ros/jazzy`,不会自动安装 ROS)。以下命令在 `camera_setup` 目录执行:
+注意：
+*1.确保 ROS2 Jazzy版本已安装*
+*2.已安装
+(`install.sh` 依赖 `/opt/ros/jazzy`,不会自动安装 ROS)。以下命令在 `camera_setup` 目录执行:
 
+安装
 ```bash
 ./install.sh
 ./camera.sh
