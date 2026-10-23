@@ -4,7 +4,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_DIR="$(dirname -- "$SCRIPT_DIR")"
 ORBBEC_WS="$REPO_DIR/OrbbecSDK_ROS2"
-WRIST_LAUNCH="$SCRIPT_DIR/launch/gemini305.launch.py"
+CAMERA_LAUNCH="$SCRIPT_DIR/launch/camera.launch.py"
 LOG_DIR="/tmp/camera_logs"
 PID_FILE="/tmp/camera_pids.txt"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/camup"
@@ -33,6 +33,9 @@ fi
 WIDTH=640
 HEIGHT=480
 FPS="${1:-}"
+LEFT_WRIST_ROTATION=0
+RIGHT_WRIST_ROTATION=0
+HEAD_ROTATION=0
 AE_MAX_EXPOSURE="${CAM_AE_MAX_EXPOSURE:-120}"
 WRIST_EXPOSURE="${CAM_WRIST_EXPOSURE:-50}"
 WRIST_GAIN="${CAM_WRIST_GAIN:-16}"
@@ -82,6 +85,35 @@ select_frame_rate() {
     if [[ "$FPS" == 60 ]]; then
         printf 'WARN: 60 Hz 在 Gemini 335Lg 上测试正常，但 Gemini 305 可能无法稳定出图。\n' >&2
     fi
+}
+
+select_rotation() {
+    local -n rotation="$1"
+    local label="$2"
+    local default_rotation="${rotation:-0}"
+    local choice
+
+    if [[ -t 0 ]]; then
+        while true; do
+            read -r -p "$label 图像旋转角度 [0/90/180/270]（默认 $default_rotation）: " choice || return 1
+            case "${choice:-$default_rotation}" in
+                0|90|180|270) rotation="${choice:-$default_rotation}"; break ;;
+                *) printf '无效角度，请输入 0、90、180 或 270。\n' >&2 ;;
+            esac
+        done
+    else
+        rotation="$default_rotation"
+    fi
+
+    log "$label: 图像旋转 ${rotation}°"
+}
+
+select_role_rotation() {
+    case "$1" in
+        left_wrist) select_rotation LEFT_WRIST_ROTATION "左腕" ;;
+        right_wrist) select_rotation RIGHT_WRIST_ROTATION "右腕" ;;
+        head) select_rotation HEAD_ROTATION "头部" ;;
+    esac
 }
 
 mkdir -p "$LOG_DIR"
@@ -164,7 +196,7 @@ stop_old_camera_processes() {
         awk -F: '$1 !~ /^zenoh/ {print $2}' "$PID_FILE" | xargs -r kill -9 2>/dev/null || true
     fi
 
-    pkill -f 'gemini305.launch.py|gemini_330_series.launch.py|relay_compressed_image.py|component_container' 2>/dev/null || true
+    pkill -f 'camera.launch.py|gemini305.launch.py|gemini_330_series.launch.py|process_camera_image.py|relay_compressed_image.py|component_container' 2>/dev/null || true
     : > "$PID_FILE"
 }
 
@@ -320,16 +352,32 @@ valid_serial_value() {
     [[ -z "$1" || "$1" =~ ^[A-Za-z0-9._-]+$ ]]
 }
 
+valid_rotation_value() {
+    case "$1" in
+        0|90|180|270) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 load_role_config() {
     [[ -f "$ROLE_CONFIG" ]] || return 1
 
     LEFT_WRIST_SERIAL="$(read_role_config_value left_wrist)"
     RIGHT_WRIST_SERIAL="$(read_role_config_value right_wrist)"
     HEAD_SERIAL="$(read_role_config_value head)"
+    LEFT_WRIST_ROTATION="$(read_role_config_value left_wrist_rotation)"
+    RIGHT_WRIST_ROTATION="$(read_role_config_value right_wrist_rotation)"
+    HEAD_ROTATION="$(read_role_config_value head_rotation)"
+    LEFT_WRIST_ROTATION="${LEFT_WRIST_ROTATION:-0}"
+    RIGHT_WRIST_ROTATION="${RIGHT_WRIST_ROTATION:-0}"
+    HEAD_ROTATION="${HEAD_ROTATION:-0}"
 
     valid_serial_value "$LEFT_WRIST_SERIAL" || return 1
     valid_serial_value "$RIGHT_WRIST_SERIAL" || return 1
     valid_serial_value "$HEAD_SERIAL" || return 1
+    valid_rotation_value "$LEFT_WRIST_ROTATION" || return 1
+    valid_rotation_value "$RIGHT_WRIST_ROTATION" || return 1
+    valid_rotation_value "$HEAD_ROTATION" || return 1
     [[ -n "$LEFT_WRIST_SERIAL" || -n "$RIGHT_WRIST_SERIAL" || -n "$HEAD_SERIAL" ]] || return 1
     [[ -z "$LEFT_WRIST_SERIAL" || -z "$RIGHT_WRIST_SERIAL" || "$LEFT_WRIST_SERIAL" != "$RIGHT_WRIST_SERIAL" ]] || return 1
     [[ -z "$LEFT_WRIST_SERIAL" || -z "$HEAD_SERIAL" || "$LEFT_WRIST_SERIAL" != "$HEAD_SERIAL" ]] || return 1
@@ -340,6 +388,7 @@ print_role() {
     local label="$1"
     local serial="$2"
     local color="$3"
+    local rotation="${4:-0}"
     local model
     local connection
     local usb_port
@@ -352,19 +401,19 @@ print_role() {
     if model="$(model_for_serial "$serial")"; then
         connection="$(connection_for_serial "$serial")"
         usb_port="$(usb_port_for_serial "$serial")"
-        printf '  %-6s 型号: %s | 序列号: %s%s%s | 连接: %s%s%s | USB口: %s%s%s\n' \
+        printf '  %-6s 型号: %s | 序列号: %s%s%s | 连接: %s%s%s | USB口: %s%s%s | 旋转: %s°\n' \
             "$label:" "$model" "$color" "$serial" "$RESET" \
-            "$color" "$connection" "$RESET" "$color" "$usb_port" "$RESET"
+            "$color" "$connection" "$RESET" "$color" "$usb_port" "$RESET" "$rotation"
     else
-        printf '  %-6s 序列号: %s%s%s（当前未连接）\n' "$label:" "$color" "$serial" "$RESET"
+        printf '  %-6s 序列号: %s%s%s（当前未连接） | 旋转: %s°\n' "$label:" "$color" "$serial" "$RESET" "$rotation"
     fi
 }
 
 print_saved_roles() {
     log "${CYAN}上次保存的相机角色配置：${RESET}"
-    print_role "左腕" "$LEFT_WRIST_SERIAL" "$CYAN"
-    print_role "右腕" "$RIGHT_WRIST_SERIAL" "$CYAN"
-    print_role "头部" "$HEAD_SERIAL" "$CYAN"
+    print_role "左腕" "$LEFT_WRIST_SERIAL" "$CYAN" "$LEFT_WRIST_ROTATION"
+    print_role "右腕" "$RIGHT_WRIST_SERIAL" "$CYAN" "$RIGHT_WRIST_ROTATION"
+    print_role "头部" "$HEAD_SERIAL" "$CYAN" "$HEAD_ROTATION"
 }
 
 model_matches_role() {
@@ -422,7 +471,8 @@ prompt_for_role() {
             right_wrist) RIGHT_WRIST_SERIAL="$serial" ;;
             head) HEAD_SERIAL="$serial" ;;
         esac
-        return 0
+        select_role_rotation "$role"
+        return
     done
 }
 
@@ -474,7 +524,8 @@ prompt_role_for_device() {
                 HEAD_SERIAL="$serial"
                 ;;
         esac
-        return 0
+        select_role_rotation "$role"
+        return
     done
 }
 
@@ -486,8 +537,11 @@ save_role_config() {
     {
         printf '# camup camera role mapping\n'
         printf 'left_wrist=%s\n' "$LEFT_WRIST_SERIAL"
+        printf 'left_wrist_rotation=%s\n' "$LEFT_WRIST_ROTATION"
         printf 'right_wrist=%s\n' "$RIGHT_WRIST_SERIAL"
+        printf 'right_wrist_rotation=%s\n' "$RIGHT_WRIST_ROTATION"
         printf 'head=%s\n' "$HEAD_SERIAL"
+        printf 'head_rotation=%s\n' "$HEAD_ROTATION"
     } > "$temp_config"
     chmod 600 "$temp_config"
     mv "$temp_config" "$ROLE_CONFIG"
@@ -503,6 +557,9 @@ configure_roles() {
     LEFT_WRIST_SERIAL=""
     RIGHT_WRIST_SERIAL=""
     HEAD_SERIAL=""
+    LEFT_WRIST_ROTATION=0
+    RIGHT_WRIST_ROTATION=0
+    HEAD_ROTATION=0
 
     log "请根据上面的型号和序列号分配相机位置。"
     if (( ${#DEVICE_SERIALS[@]} < 3 )); then
@@ -566,6 +623,8 @@ make_gemini305_config() {
     local enable_right=false
     local left_color_format=ANY
     local right_color_format=ANY
+    local left_color_rotation=0
+    local right_color_rotation=0
 
     case "$eye" in
         left)
@@ -594,11 +653,13 @@ make_gemini305_config() {
         -e 's/^left_color_height:.*/left_color_height: 480/' \
         -e "s/^left_color_fps:.*/left_color_fps: $FPS/" \
         -e "s/^left_color_format:.*/left_color_format: $left_color_format/" \
+        -e "s/^left_color_rotation:.*/left_color_rotation: $left_color_rotation/" \
         -e "s/^enable_right_color:.*/enable_right_color: $enable_right/" \
         -e 's/^right_color_width:.*/right_color_width: 640/' \
         -e 's/^right_color_height:.*/right_color_height: 480/' \
         -e "s/^right_color_fps:.*/right_color_fps: $FPS/" \
         -e "s/^right_color_format:.*/right_color_format: $right_color_format/" \
+        -e "s/^right_color_rotation:.*/right_color_rotation: $right_color_rotation/" \
         -e 's/^enable_color_auto_exposure_priority:.*/enable_color_auto_exposure_priority: false/' \
         -e 's/^enable_color_auto_white_balance:.*/enable_color_auto_white_balance: false/' \
         -e 's/^enable_color_auto_exposure:.*/enable_color_auto_exposure: false/' \
@@ -699,7 +760,8 @@ wait_for_topic_once() {
 
 main() {
     require_file "$ORBBEC_WS/install/setup.bash"
-    require_file "$WRIST_LAUNCH"
+    require_file "$CAMERA_LAUNCH"
+    require_file "$SCRIPT_DIR/process_camera_image.py"
     ensure_usb_permissions
     require_file "$ORBBEC_WS/orbbec_camera/launch/gemini305.launch.py"
     require_file "$ORBBEC_WS/orbbec_camera/launch/gemini_330_series.launch.py"
@@ -733,7 +795,7 @@ main() {
     elif has_serial "$LEFT_WRIST_SERIAL"; then
         has_left=1
         left_usb_port="$(usb_port_for_serial "$LEFT_WRIST_SERIAL")"
-        log "左腕: 型号=$(model_for_serial "$LEFT_WRIST_SERIAL") 序列号=${GREEN}${LEFT_WRIST_SERIAL}${RESET} 连接=${GREEN}$(connection_for_serial "$LEFT_WRIST_SERIAL")${RESET} USB口=${GREEN}${left_usb_port}${RESET}"
+        log "左腕: 型号=$(model_for_serial "$LEFT_WRIST_SERIAL") 序列号=${GREEN}${LEFT_WRIST_SERIAL}${RESET} 连接=${GREEN}$(connection_for_serial "$LEFT_WRIST_SERIAL")${RESET} USB口=${GREEN}${left_usb_port}${RESET} 旋转=${LEFT_WRIST_ROTATION}°"
     else
         warn_missing_serial "left wrist" "$LEFT_WRIST_SERIAL"
     fi
@@ -743,7 +805,7 @@ main() {
     elif has_serial "$RIGHT_WRIST_SERIAL"; then
         has_right=1
         right_usb_port="$(usb_port_for_serial "$RIGHT_WRIST_SERIAL")"
-        log "右腕: 型号=$(model_for_serial "$RIGHT_WRIST_SERIAL") 序列号=${GREEN}${RIGHT_WRIST_SERIAL}${RESET} 连接=${GREEN}$(connection_for_serial "$RIGHT_WRIST_SERIAL")${RESET} USB口=${GREEN}${right_usb_port}${RESET}"
+        log "右腕: 型号=$(model_for_serial "$RIGHT_WRIST_SERIAL") 序列号=${GREEN}${RIGHT_WRIST_SERIAL}${RESET} 连接=${GREEN}$(connection_for_serial "$RIGHT_WRIST_SERIAL")${RESET} USB口=${GREEN}${right_usb_port}${RESET} 旋转=${RIGHT_WRIST_ROTATION}°"
     else
         warn_missing_serial "right wrist" "$RIGHT_WRIST_SERIAL"
     fi
@@ -753,7 +815,7 @@ main() {
     elif has_serial "$HEAD_SERIAL"; then
         has_head=1
         head_usb_port="$(usb_port_for_serial "$HEAD_SERIAL")"
-        log "头部: 型号=$(model_for_serial "$HEAD_SERIAL") 序列号=${GREEN}${HEAD_SERIAL}${RESET} 连接=${GREEN}$(connection_for_serial "$HEAD_SERIAL")${RESET} USB口=${GREEN}${head_usb_port}${RESET}"
+        log "头部: 型号=$(model_for_serial "$HEAD_SERIAL") 序列号=${GREEN}${HEAD_SERIAL}${RESET} 连接=${GREEN}$(connection_for_serial "$HEAD_SERIAL")${RESET} USB口=${GREEN}${head_usb_port}${RESET} 旋转=${HEAD_ROTATION}°"
     else
         warn_missing_serial "head" "$HEAD_SERIAL"
     fi
@@ -770,8 +832,10 @@ main() {
     if (( has_left == 1 )); then
         make_gemini305_config "$LEFT_RUNTIME_CONFIG" "$LEFT_WRIST_SERIAL" "$left_usb_port" left
         start_background "camera_left_wrist" "$LOG_DIR/camera_left_wrist.log" \
-            ros2 launch "$WRIST_LAUNCH" \
+            ros2 launch "$CAMERA_LAUNCH" \
             camera_name:=camera_left_wrist \
+            image_stream:=left_color \
+            image_rotation:="$LEFT_WRIST_ROTATION" \
             serial_number:="$LEFT_WRIST_SERIAL" \
             usb_port:="$left_usb_port" \
             config_file_path:="$LEFT_RUNTIME_CONFIG"
@@ -781,8 +845,10 @@ main() {
     if (( has_right == 1 )); then
         make_gemini305_config "$RIGHT_RUNTIME_CONFIG" "$RIGHT_WRIST_SERIAL" "$right_usb_port" right
         start_background "camera_right_wrist" "$LOG_DIR/camera_right_wrist.log" \
-            ros2 launch "$WRIST_LAUNCH" \
+            ros2 launch "$CAMERA_LAUNCH" \
             camera_name:=camera_right_wrist \
+            image_stream:=right_color \
+            image_rotation:="$RIGHT_WRIST_ROTATION" \
             serial_number:="$RIGHT_WRIST_SERIAL" \
             usb_port:="$right_usb_port" \
             config_file_path:="$RIGHT_RUNTIME_CONFIG"
@@ -791,14 +857,18 @@ main() {
 
     if (( has_head == 1 )); then
         start_background "camera_head" "$LOG_DIR/camera_head.log" \
-            ros2 launch orbbec_camera gemini_330_series.launch.py \
+            ros2 launch "$CAMERA_LAUNCH" \
+            driver_launch:=gemini_330_series.launch.py \
             camera_name:=camera_head \
+            image_stream:=color \
+            image_rotation:="$HEAD_ROTATION" \
             serial_number:="$HEAD_SERIAL" \
             usb_port:="$head_usb_port" \
             enable_color:=true \
             color_width:="$WIDTH" \
             color_height:="$HEIGHT" \
             color_fps:="$FPS" \
+            color_rotation:=0 \
             enable_color_auto_exposure_priority:=false \
             enable_color_auto_exposure:=true \
             enable_color_auto_white_balance:=false \

@@ -23,6 +23,7 @@ echo "==> Installing apt packages"
 $SUDO apt update
 $SUDO apt install -y \
   libusb-1.0-0-dev libgflags-dev python3-rosdep python3-colcon-common-extensions \
+  python3-opencv python3-numpy \
   ros-${ROS_DISTRO_NAME}-rmw-zenoh-cpp \
   ros-${ROS_DISTRO_NAME}-compressed-image-transport \
   ros-${ROS_DISTRO_NAME}-rqt-image-view

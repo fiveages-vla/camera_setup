@@ -36,6 +36,6 @@ if [[ -f "$pid_file" ]]; then
     : > "$pid_file"
 fi
 
-pkill -f 'gemini305.launch.py|gemini_330_series.launch.py|relay_compressed_image.py|component_container' 2>/dev/null || true
+pkill -f 'camera.launch.py|gemini305.launch.py|gemini_330_series.launch.py|process_camera_image.py|relay_compressed_image.py|component_container' 2>/dev/null || true
 stop_camera_launcher
 echo "camera processes stopped; Zenoh router left running"
