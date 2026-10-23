@@ -1,0 +1,25 @@
+# Gemini 305 wrist camera, right eye, 640x480 YUYV. camera.sh overrides *_rotation/*_fps.
+# Only keys gemini305.launch.py does not take as launch args live here. Yaml overrides the
+# command line, so serial, USB port, exposure, gain and white balance must not be added.
+device_preset: "Dual Color Streams"
+enable_color: false
+enable_depth: false
+enable_left_ir: false
+enable_right_ir: false
+enable_point_cloud: false
+
+enable_right_color: true
+right_color_width: 640
+right_color_height: 480
+right_color_fps: 30
+right_color_format: YUYV
+right_color_rotation: 0
+right_color.image_raw.enable_pub_plugins: ["image_transport/compressed"]
+
+# The Dual Color Streams preset forces both eyes on whatever enable_*_color says,
+# so the unused eye is kept at a minimal profile. At its default 848x530@15 YUYV it
+# takes the USB 2 bandwidth and the eye we publish never delivers a frame.
+enable_left_color: false
+left_color_width: 640
+left_color_height: 480
+left_color_fps: 5

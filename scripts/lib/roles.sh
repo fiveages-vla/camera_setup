@@ -40,9 +40,15 @@ parse_detected_devices() {
             *"connection: "*)
                 connection="${line##*connection: }"
                 ;;
-            *"usb port: "*)
-                usb_port="${line##*usb port: }"
-                if [[ -n "$model" && -n "$serial" && -n "$usb_port" ]]; then
+            *"usb port:"*)
+                usb_port="${line##*usb port:}"
+                usb_port="${usb_port# }"
+                if [[ -n "$model" && -n "$serial" ]] && ! valid_serial_value "$serial"; then
+                    log "WARN: skipping $model with unexpected serial: $serial"
+                elif [[ -n "$model" && -n "$serial" ]]; then
+                    if [[ -z "$usb_port" ]]; then
+                        log "WARN: $model $serial reported no port id; it will be selected by serial number only."
+                    fi
                     DEVICE_MODELS+=("$model")
                     DEVICE_SERIALS+=("$serial")
                     DEVICE_CONNECTIONS+=("${connection:-unknown}")
@@ -78,7 +84,7 @@ print_detected_devices() {
             "${DEVICE_CONNECTIONS[$index]}" \
             "$RESET" \
             "$YELLOW" \
-            "${DEVICE_USB_PORTS[$index]}" \
+            "${DEVICE_USB_PORTS[$index]:--}" \
             "$RESET"
     done
     log ""
@@ -172,15 +178,7 @@ read_rotation_config_value() {
     printf '%s\n' "${value:-0}"
 }
 
-dimensions_for_rotation() {
-    case "$1" in
-        90|270) printf '%s %s\n' "$HEIGHT" "$WIDTH" ;;
-        *)      printf '%s %s\n' "$WIDTH" "$HEIGHT" ;;
-    esac
-}
-
-# Print the eye of a Gemini 305 wrist camera to use for a role. Rotating the
-# image by 90/270 degrees turns the stereo pair, so the opposite eye is used.
+# Print the Gemini 305 eye to use: 0/180 keep default_eye, 90/270 use the other one.
 eye_for_rotation() {
     local default_eye="$1"
     local rotation="$2"
@@ -234,7 +232,7 @@ print_role() {
         usb_port="$(usb_port_for_serial "$serial")"
         printf '  %-6s 型号: %s | 序列号: %s%s%s | 连接: %s%s%s | 端口: %s%s%s | 旋转: %s°\n' \
             "$label:" "$model" "$color" "$serial" "$RESET" \
-            "$color" "$connection" "$RESET" "$color" "$usb_port" "$RESET" "$rotation"
+            "$color" "$connection" "$RESET" "$color" "${usb_port:--}" "$RESET" "$rotation"
     else
         printf '  %-6s 序列号: %s%s%s | 旋转: %s°（当前未连接）\n' "$label:" "$color" "$serial" "$RESET" "$rotation"
     fi
@@ -374,7 +372,7 @@ prompt_role_for_device() {
     printf '\n为相机 [%d] 分配位置：型号: %s | 序列号: %s%s%s | 连接: %s%s%s | 端口: %s%s%s\n' \
         "$((index + 1))" "$model" "$YELLOW" "$serial" "$RESET" \
         "$YELLOW" "${DEVICE_CONNECTIONS[$index]}" "$RESET" \
-        "$YELLOW" "${DEVICE_USB_PORTS[$index]}" "$RESET"
+        "$YELLOW" "${DEVICE_USB_PORTS[$index]:--}" "$RESET"
 
     while true; do
         printf '  1) 左腕\n'

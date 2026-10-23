@@ -100,6 +100,26 @@ signal_process_groups() {
     done
 }
 
+# Give the drivers time to close their streams after SIGTERM. A camera killed
+# while still streaming can come back without delivering frames.
+STOP_GRACE_SECONDS=10
+
+# Return once every given process group is gone, or after STOP_GRACE_SECONDS.
+wait_for_process_groups_exit() {
+    local deadline=$((SECONDS + STOP_GRACE_SECONDS))
+    local pid
+    local alive
+
+    while (( SECONDS < deadline )); do
+        alive=0
+        for pid in "$@"; do
+            ! kill -0 -- "-$pid" 2>/dev/null || alive=1
+        done
+        (( alive )) || return 0
+        sleep 0.5
+    done
+}
+
 # Stop the processes recorded by camera.sh (the Zenoh router is left running).
 stop_recorded_processes() {
     local -a pids=()
@@ -108,7 +128,7 @@ stop_recorded_processes() {
     mapfile -t pids < <(awk -F: '$1 !~ /^zenoh/ && $2 ~ /^[0-9]+$/ && $2 > 1 {print $2}' "$PID_FILE")
     if (( ${#pids[@]} > 0 )); then
         signal_process_groups TERM "${pids[@]}"
-        sleep 1
+        wait_for_process_groups_exit "${pids[@]}"
         signal_process_groups KILL "${pids[@]}"
     fi
     : > "$PID_FILE"
@@ -116,5 +136,5 @@ stop_recorded_processes() {
 
 stop_camera_processes() {
     stop_recorded_processes
-    pkill -f 'gemini305.launch.py|gemini_330_series.launch.py' 2>/dev/null || true
+    pkill -f 'wrist.launch.py|gemini305.launch.py|gemini_330_series.launch.py' 2>/dev/null || true
 }

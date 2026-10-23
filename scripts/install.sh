@@ -38,6 +38,14 @@ $SUDO apt install -y \
 echo "==> Installing Orbbec udev rules"
 $SUDO bash "${SDK_DIR}/orbbec_camera/scripts/install_udev_rules.sh"
 
+# GMSL cameras (Gemini 335Lg) are V4L2 devices owned by the video group; the
+# udev rule above only covers USB cameras.
+if [ "$(id -u)" -ne 0 ] && ! id -nG | tr ' ' '\n' | grep -qx video; then
+  echo "==> Adding $USER to the video group for GMSL camera access"
+  $SUDO usermod -aG video "$USER"
+  echo "    Log out and back in before starting GMSL cameras."
+fi
+
 echo "==> Resolving ROS dependencies with rosdep"
 # setup.bash references unset variables, so relax -u while sourcing
 set +u
