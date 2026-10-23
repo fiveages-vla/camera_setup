@@ -32,18 +32,6 @@ Gemini 305 左右腕相机 + Gemini 335Lg 头部相机。OrbbecSDK_ROS2版本v2.
 
 选 **2) 启动相机**,直接进入帧率选择和设备扫描。安装或重新编译驱动请选 **1) 安装依赖并编译**。
 
-分配每台相机的位置(左腕/右腕/头部)时,会接着选择该相机的画面旋转角度(0/90/180/270),和相机位置一起保存到 `~/.config/camera_setup/camera_roles.conf`。
-下次启动选「使用上次配置」会沿用;安装位置变化时选「重新检测并填写相机位置」,角度会以上次的值为默认。
-
-旋转由 Orbbec SDK 的帧处理器在驱动内完成,相机标定(`camera_info`)随之同步变换,脚本不做额外处理。两个前提是实测得出的:
-
-- 必须使用非压缩格式(YUYV)。MJPG 压缩帧无法被 SDK 旋转,设了角度也只会原样输出。
-- 分辨率必须按传感器原生的 640×480 请求;旋转 90/270 后发布出来的画面自然变成 480×640。请求 480×640 会找不到 profile 导致驱动退出。
-
-腕部由 `resources/launch/wrist.launch.py` 启动:它原样包含 SDK 的 `gemini305.launch.py`,只把所用那只眼的 `left_color`/`right_color` 话题重映射到 `color`,因此左右腕对外都是 `/camera_*_wrist/color/...`。腕部 Gemini 305 的驱动参数只能通过 yaml 传入,`resources/config/gemini305_left_wrist.yaml` 和 `gemini305_right_wrist.yaml` 按所用的眼区分,与左右腕无关:旋转 0°/180° 时左右腕都用右目,90°/270° 时都用左目。角度为 0 且 30 Hz 时直接使用仓库里的文件;其他角度或 60 Hz 时,脚本只改 `*_color_rotation`/`*_color_fps` 两个键,把副本写到运行时目录。序列号、USB 口、曝光、增益、白平衡以命令行参数传入(yaml 里的值会覆盖命令行,所以这些键不出现在 yaml 中)。
-
-头部 335Lg 若以 USB 2 连接,YUYV 60 Hz 可能超出带宽,脚本会给出提示;需要 60 Hz 时请接 USB 3 口。
-
 日志、PID 文件和运行时生成的配置都放在当前用户的私有目录 `$XDG_RUNTIME_DIR/camera_setup-<uid>/`(没有 `XDG_RUNTIME_DIR` 时是 `/tmp/camera_setup-<uid>/`),权限 700,日志在其中的 `logs/` 下。
 
 ### 1.3 可视化
