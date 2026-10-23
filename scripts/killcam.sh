@@ -3,7 +3,10 @@ set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 camera_script="$script_dir/camera.sh"
-pid_file="/tmp/camera_pids.txt"
+
+# shellcheck source=lib/common.sh
+source "$script_dir/lib/common.sh"
+init_runtime_dir
 
 stop_camera_launcher() {
     local proc_dir
@@ -29,13 +32,6 @@ stop_camera_launcher() {
     done
 }
 
-if [[ -f "$pid_file" ]]; then
-    awk -F: '$1 !~ /^zenoh/ {print $2}' "$pid_file" | xargs -r kill 2>/dev/null || true
-    sleep 1
-    awk -F: '$1 !~ /^zenoh/ {print $2}' "$pid_file" | xargs -r kill -9 2>/dev/null || true
-    : > "$pid_file"
-fi
-
-pkill -f 'gemini305.launch.py|gemini_330_series.launch.py|relay_compressed_image.py|component_container' 2>/dev/null || true
+stop_camera_processes
 stop_camera_launcher
 echo "camera processes stopped; Zenoh router left running"

@@ -3,9 +3,17 @@
 # Usage: ./scripts/install.sh
 set -euo pipefail
 
-ROS_DISTRO_NAME=jazzy
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
 SDK_DIR="${REPO_DIR}/OrbbecSDK_ROS2"
+
+# shellcheck source=lib/common.sh
+source "$SCRIPT_DIR/lib/common.sh"
+
+if [ ! -e "${SDK_DIR}/.git" ]; then
+  echo "==> Fetching OrbbecSDK_ROS2 submodule"
+  git -C "${REPO_DIR}" submodule update --init
+fi
 
 if [ "$(id -u)" -eq 0 ]; then
   SUDO=""

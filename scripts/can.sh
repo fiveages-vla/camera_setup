@@ -132,6 +132,27 @@ select_mode() {
     esac
 }
 
+# Print the interface for a port number (1-based) or a canN name.
+resolve_interface_choice() {
+    local choice="$1"
+    local index iface
+
+    if [[ "$choice" =~ ^[0-9]+$ ]]; then
+        index=$((10#$choice - 1))
+        ((index >= 0 && index < ${#detected_interfaces[@]})) || die "port number out of range: $choice"
+        printf '%s\n' "${detected_interfaces[$index]}"
+        return
+    fi
+
+    for iface in "${detected_interfaces[@]}"; do
+        if [[ "$choice" == "$iface" ]]; then
+            printf '%s\n' "$iface"
+            return
+        fi
+    done
+    die "CAN interface not detected: $choice"
+}
+
 select_interfaces() {
     local selection choice iface index driver
     local -a choices=()
@@ -166,18 +187,7 @@ select_interfaces() {
 
     interfaces=()
     for choice in "${choices[@]}"; do
-        iface=""
-        if [[ "$choice" =~ ^[0-9]+$ ]]; then
-            index=$((10#$choice - 1))
-            ((index >= 0 && index < ${#detected_interfaces[@]})) || die "port number out of range: $choice"
-            iface="${detected_interfaces[$index]}"
-        else
-            for iface in "${detected_interfaces[@]}"; do
-                [[ "$choice" == "$iface" ]] && break
-            done
-            [[ "$choice" == "$iface" ]] || die "CAN interface not detected: $choice"
-        fi
-
+        iface="$(resolve_interface_choice "$choice")" || exit 1
         if [[ -z "${seen[$iface]+present}" ]]; then
             interfaces+=("$iface")
             seen["$iface"]=1
