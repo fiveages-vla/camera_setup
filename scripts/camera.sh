@@ -442,7 +442,7 @@ prompt_for_role() {
     local model
 
     while true; do
-        read -r -p "请选择${label}相机编号: " choice
+        read -r -p "请选择${label}相机编号: " choice || return 1
         if [[ ! "$choice" =~ ^[0-9]+$ ]] || (( choice < 1 || choice > ${#DEVICE_SERIALS[@]} )); then
             printf '无效编号，请输入 1-%d。\n' "${#DEVICE_SERIALS[@]}" >&2
             continue
@@ -492,7 +492,7 @@ prompt_role_for_device() {
         printf '  1) 左腕\n'
         printf '  2) 右腕\n'
         printf '  3) 头部\n'
-        read -r -p '请选择位置 [1-3]: ' choice
+        read -r -p '请选择位置 [1-3]: ' choice || return 1
 
         case "$choice" in
             1) role="left_wrist" ;;
@@ -590,7 +590,7 @@ select_role_configuration() {
             printf '\n请选择启动配置：\n'
             printf '  1) 使用上次配置（默认）\n'
             printf '  2) 重新检测并填写相机位置\n'
-            read -r -p '请输入选项 [1-2]: ' choice
+            read -r -p '请输入选项 [1-2]: ' choice || return 1
             case "$choice" in
                 ''|1) return 0 ;;
                 2) configure_roles; return ;;
