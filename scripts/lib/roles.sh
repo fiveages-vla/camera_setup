@@ -179,6 +179,20 @@ dimensions_for_rotation() {
     esac
 }
 
+# Print the eye of a Gemini 305 wrist camera to use for a role. Rotating the
+# image by 90/270 degrees turns the stereo pair, so the opposite eye is used.
+eye_for_rotation() {
+    local default_eye="$1"
+    local rotation="$2"
+
+    case "$rotation" in
+        90|270)
+            if [[ "$default_eye" == left ]]; then printf 'right\n'; else printf 'left\n'; fi
+            ;;
+        *) printf '%s\n' "$default_eye" ;;
+    esac
+}
+
 load_role_config() {
     [[ -f "$ROLE_CONFIG" ]] || return 1
 

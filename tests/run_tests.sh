@@ -69,6 +69,26 @@ test_dimensions_for_rotation() {
     assert_eq "270 swaps" "480 640" "$(dimensions_for_rotation 270)"
 }
 
+test_eye_for_rotation() {
+    assert_eq "left wrist 0 uses left" "left" "$(eye_for_rotation left 0)"
+    assert_eq "left wrist 90 uses right" "right" "$(eye_for_rotation left 90)"
+    assert_eq "left wrist 180 uses left" "left" "$(eye_for_rotation left 180)"
+    assert_eq "left wrist 270 uses right" "right" "$(eye_for_rotation left 270)"
+    assert_eq "right wrist 0 uses right" "right" "$(eye_for_rotation right 0)"
+    assert_eq "right wrist 90 uses left" "left" "$(eye_for_rotation right 90)"
+    assert_eq "right wrist 180 uses right" "right" "$(eye_for_rotation right 180)"
+    assert_eq "right wrist 270 uses left" "left" "$(eye_for_rotation right 270)"
+}
+
+test_wrist_topic_follows_eye() {
+    assert_eq "left wrist 90 topic uses right eye" \
+        "/camera_left_wrist/right_color/image_raw/compressed" \
+        "$(wrist_topic camera_left_wrist "$(eye_for_rotation left 90)")"
+    assert_eq "right wrist 0 topic uses right eye" \
+        "/camera_right_wrist/right_color/image_raw/compressed" \
+        "$(wrist_topic camera_right_wrist "$(eye_for_rotation right 0)")"
+}
+
 test_valid_rotation_value() {
     local value
     for value in 0 90 180 270; do

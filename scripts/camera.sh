@@ -21,8 +21,9 @@ WAIT_TIMEOUT="${CAM_WAIT_TIMEOUT:-180}"
 LEFT_RUNTIME_CONFIG=""
 RIGHT_RUNTIME_CONFIG=""
 
-LEFT_TOPIC="/camera_left_wrist/left_color/image_raw/compressed"
-RIGHT_TOPIC="/camera_right_wrist/right_color/image_raw/compressed"
+# Wrist topics depend on the eye in use, so they are set by start_cameras.
+LEFT_TOPIC=""
+RIGHT_TOPIC=""
 HEAD_TOPIC="/camera_head/color/image_raw/compressed"
 
 # Set by resolve_active_cameras: whether each configured camera is plugged in.
@@ -370,6 +371,10 @@ resolve_active_cameras() {
     fi
 }
 
+wrist_topic() {
+    printf '/%s/%s_color/image_raw/compressed\n' "$1" "$2"
+}
+
 # start_wrist <name> <eye> <serial> <usb_port> <rotation> <runtime_config> <topic>
 start_wrist() {
     local name="$1"
@@ -423,12 +428,20 @@ start_head() {
 }
 
 start_cameras() {
+    local eye
+
     if (( HAS_LEFT == 1 )); then
-        start_wrist camera_left_wrist left "$LEFT_WRIST_SERIAL" "$LEFT_USB_PORT" \
+        eye="$(eye_for_rotation left "$LEFT_WRIST_ROTATION")"
+        LEFT_TOPIC="$(wrist_topic camera_left_wrist "$eye")"
+        log "左腕: 旋转 ${LEFT_WRIST_ROTATION}° 使用${eye}目"
+        start_wrist camera_left_wrist "$eye" "$LEFT_WRIST_SERIAL" "$LEFT_USB_PORT" \
             "$LEFT_WRIST_ROTATION" "$LEFT_RUNTIME_CONFIG" "$LEFT_TOPIC"
     fi
     if (( HAS_RIGHT == 1 )); then
-        start_wrist camera_right_wrist right "$RIGHT_WRIST_SERIAL" "$RIGHT_USB_PORT" \
+        eye="$(eye_for_rotation right "$RIGHT_WRIST_ROTATION")"
+        RIGHT_TOPIC="$(wrist_topic camera_right_wrist "$eye")"
+        log "右腕: 旋转 ${RIGHT_WRIST_ROTATION}° 使用${eye}目"
+        start_wrist camera_right_wrist "$eye" "$RIGHT_WRIST_SERIAL" "$RIGHT_USB_PORT" \
             "$RIGHT_WRIST_ROTATION" "$RIGHT_RUNTIME_CONFIG" "$RIGHT_TOPIC"
     fi
     if (( HAS_HEAD == 1 )); then

@@ -37,6 +37,8 @@ Gemini 305 左右腕相机 + Gemini 335Lg 头部相机。OrbbecSDK_ROS2版本v2.
 
 旋转在相机设备端完成,角度为 90/270 时会把请求的分辨率从 640×480 换成 480×640,所以各路画面的实际宽高会随各自的角度而不同。
 
+腕部 Gemini 305 是双目相机,默认左腕用左目、右腕用右目。旋转 90/270 度后双目的左右关系随之对调,所以会自动换用另一只眼(左腕用右目、右腕用左目),话题名里的 `left_color`/`right_color` 也随之变化;0/180 度不变。
+
 日志、PID 文件和运行时生成的配置都放在当前用户的私有目录 `$XDG_RUNTIME_DIR/camera_setup-<uid>/`(没有 `XDG_RUNTIME_DIR` 时是 `/tmp/camera_setup-<uid>/`),权限 700,日志在其中的 `logs/` 下。
 
 ### 1.3 可视化
@@ -45,8 +47,8 @@ Gemini 305 左右腕相机 + Gemini 335Lg 头部相机。OrbbecSDK_ROS2版本v2.
 
 ### 1.4 话题
 
-- `/camera_left_wrist/left_color/image_raw/compressed`
-- `/camera_right_wrist/right_color/image_raw/compressed`
+- `/camera_left_wrist/left_color/image_raw/compressed`(左腕旋转 90/270 时为 `right_color`)
+- `/camera_right_wrist/right_color/image_raw/compressed`(右腕旋转 90/270 时为 `left_color`)
 - `/camera_head/color/image_raw/compressed`
 
 ## 2. CAN
